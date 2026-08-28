@@ -1,376 +1,298 @@
 # 100 Times AI Hero's Journey
 
-AIを活用してヒーローズ・ジャーニーの物語構造に基づいた物語を自動生成するGoogle Colabノートブックです。
+作家の自己ナラティブから、ヒーローズ・ジャーニー形式の物語を生成するPython CLI/APIです。
+標準ではOllama上のローカルモデルを使うため、入力と生成物を外部APIへ送らずに実行できます。
+元のGoogle Colabノートブックもリポジトリに残していますが、繰り返し生成・途中再開・重複除外を行う場合は、
+ローカル版の `run_pipeline.py` を使ってください。
 
-## 概要
+## まず動かす
 
-このプロジェクトは、Joseph・キャンベルの「ヒーローズ・ジャーニー（英雄の旅）」理論に基づき、OpenAI APIを使用して物語を自動生成するシステムです。作家のナラティブや世界観設定を入力として、12段階の物語構造に沿った完全な物語プロットを生成します。
+### 必要なもの
 
-## 主な機能
+- Python 3.10以上
+- [Ollama](https://ollama.com/)
+- 生成に使うOllamaモデル（未インストールの場合、CLIが明示指定モデルまたは既定モデルを自動取得します）
 
-### 1. AI統合
-- OpenAI API（o3-mini、GPT-4o-miniなど）を使用した物語生成
-- JSON形式でのデータ構造化
-- カスタマイズ可能なreasoning effort設定
+Python依存関係は `requests` のみです。テストも実行する場合は開発依存関係を入れます。
 
-### 2. 物語構造生成
-ヒーローズ・ジャーニーの12段階に基づいた物語構造：
+```bash
+python3 -m venv .venv
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
+python -m pip install -r requirements.txt
+# テストも行う場合
+python -m pip install -r requirements-dev.txt
+```
+
+Ollamaを起動したターミナルとは別のターミナルで、次を実行します。
+
+```bash
+ollama serve
+```
+
+最初は1作品・候補プール3件で動作を確認してください。完全版は既定で12段階・10章です。
+
+```bash
+python run_pipeline.py \
+  --narrative-json narrative.example.json \
+  --loops 1 \
+  --pool-size 3 \
+  --model gpt-oss:20b \
+  --batch-id quickstart
+```
+
+完了すると、`output/batch_quickstart/` に分析、世界観、プロット、本文、メタデータが保存されます。
+`gpt-oss:20b` が未インストールなら、CLIが `ollama pull gpt-oss:20b` を実行します。
+既に別のモデルを使いたい場合は `--model` を変更してください。
+
+## 入力を変える
+
+`--narrative-json` には次の13項目を持つJSONを指定します。
+
+`author`, `missing`, `status`, `memories`, `mission`, `success`, `loss`, `taboo`,
+`inhibit`, `daily`, `change`, `acceptance`, `desire`
+
+各値は文字列です。項目が欠けているJSONはサンプル値で補完されるため、
+本番利用では13項目をすべて自分の内容に置き換えてください。
+
+```json
+{
+  "author": "自己紹介",
+  "missing": "自分に欠けていると感じるもの",
+  "status": "現在の状態",
+  "memories": "印象に残っている記憶",
+  "mission": "果たしたい使命",
+  "success": "成功のイメージ",
+  "loss": "失うことが怖いもの",
+  "taboo": "越えたくない境界",
+  "inhibit": "自分を抑えているもの",
+  "daily": "日常",
+  "change": "変化のきっかけ",
+  "acceptance": "受け入れられること／受け入れにくいこと",
+  "desire": "本当の願望"
+}
+```
+
+## 繰り返し生成・途中再開
+
+`--loops N`（旧名 `--variations N`）が生成する完成作品数です。
+`--pool-size` はキャラクター生成に使う願望・能力・課題の候補数で、作品数や章数ではありません。
+100作品を生成する場合は、例えば次のように固定バッチ名を付けます。
+
+```bash
+python run_pipeline.py \
+  --narrative-json narrative.example.json \
+  --model gpt-oss:20b \
+  --loops 100 \
+  --pool-size 100 \
+  --seed 42 \
+  --batch-id experiment-01
+```
+
+処理を中断した場合は、同じナラティブJSONを指定して再開します。`--loops` はそのバッチの最終目標数です。
+完了済みの `run_001` などはスキップされ、保存済みの準備データと章チェックポイントが再利用されます。
+
+```bash
+python run_pipeline.py \
+  --narrative-json narrative.example.json \
+  --model gpt-oss:20b \
+  --loops 100 \
+  --resume output/batch_experiment-01
+```
+
+同じ内容の作品はデフォルトで重複除外されます。重複を許可する場合は `--allow-duplicates` を指定します。
+重複試行の上限は `--max-attempts N` で変更できます。
+
+章本文は章ごとにチェックポイント保存されます。出力上限で章が切れた場合は、既定で最大2回続きを生成します。
+この回数は `--max-chapter-continuations N` で変更できます。
+
+## CLIオプション
+
+| オプション | 既定値 | 用途 |
+|---|---:|---|
+| `--model NAME` | 自動選択 | Ollamaモデル。未導入なら自動取得 |
+| `--provider NAME` | `ollama` | `ollama` / `openai` / `anthropic` / `deepseek` |
+| `--loops N` | `1` | 完成作品の目標数 |
+| `--pool-size N` | `100` | 願望・能力・課題の候補数 |
+| `--journey-stages 11\|12` | `12` | ヒーローズ・ジャーニーの段階数 |
+| `--chapter-count N` | `10` | 1作品の章数 |
+| `--resume DIR` | なし | 既存バッチを途中再開 |
+| `--batch-id NAME` | 自動生成 | `output/batch_NAME` として保存 |
+| `--no-chapters` | 無効 | 章本文を生成せずプロットまで作成 |
+| `--no-world` | 無効 | 世界観生成を省略 |
+| `--no-skeleton` | 無効 | プロット骨子A〜Eを省略 |
+| `--no-visual-prompts` | 無効 | ビジュアルプロンプトを省略 |
+| `--allow-duplicates` | 無効 | 重複除外を無効化 |
+| `--list-models` | 無効 | インストール済みOllamaモデルを表示 |
+| `--timeout SEC` | `600` | 1回のLLMリクエストのタイムアウト |
+
+全オプションは次で確認できます。
+
+```bash
+python run_pipeline.py --help
+```
+
+## モデルの選択
+
+インストール済みモデルの一覧を確認できます。
+
+```bash
+python run_pipeline.py --list-models
+```
+
+`--model` を省略した場合の動作は次のとおりです。
+
+1. Ollamaにインストール済みのモデルがあれば、それを選択する
+2. 対話端末で複数ある場合は番号で選択する
+3. `gpt-oss:20b` があれば優先する。なければ一覧の先頭を選ぶ
+4. モデルが1つもなければ `gpt-oss:20b` を自動取得する
+
+現在のマシンに入っているモデルは環境によって異なります。`qwen3.8:27b`、`gpt-oss:20b`、
+`gemma4:e4b` など、Ollamaで利用できるモデル名を `--model` に指定できます。
+
+## 生成される工程
+
+完全版パイプラインは次の成果物を順に作ります。
+
+1. ナラティブ分析（願望・抑圧・葛藤・10要素）
+2. キャラクター用要素プール
+3. プロット形式の分類
+4. 物語世界
+5. 主人公、使者、援助者、敵対者
+6. プロット骨子A〜E
+7. ヒーローズ・ジャーニーの11または12段階プロット
+8. 指定章数の本文
+9. タイトル
+10. キャラクター別ビジュアルプロンプト
+11. Markdown、JSON、チェックポイントの保存
+
+標準の12段階は次のとおりです。
+
 1. 日常世界
 2. 冒険への呼びかけ
 3. 拒否
 4. 師との出会い
 5. 第一関門の突破
 6. 試練、仲間、敵
-7. 最大の試練
-8. 報酬
-9. 帰路
-10. 復活
-11. 宝を持ち帰る
+7. 最も危険な場所への接近
+8. 最大の試練
+9. 報酬
+10. 帰路
+11. 復活
+12. 宝を持ち帰る
 
-### 3. キャラクター生成
-以下のキャラクタータイプを自動生成：
-- **主人公（Protagonist）**: 物語の中心人物
-- **援助者（Supporter）**: 主人公をサポートする人物
-- **使者（Messenger）**: 主人公に冒険を促す人物
-- **敵対者（Adversary）**: 主人公と対立する人物
+自動評価やランキング機能は現在実装していません。
 
-### 4. 世界観設定
-以下の要素を含む詳細な世界観を構築：
-- 日常世界の描写
-- 非日常世界の設定
-- 社会構造
-- 組織体
-- 生活風習
-- 人々の価値観
+## 出力構成
 
-### 5. データ管理
-- Google Spreadsheetsとの統合
-- 生成したデータの自動保存
-- Markdown形式での出力
-
-## 使用方法
-
-### 必要条件
-- Google Colab環境
-- OpenAI APIキー
-- Google Sheetsへのアクセス権限（オプション）
-
-### セットアップ
-
-1. **依存関係のインストール**
-```python
-!pip install openai==0.28
+```text
+output/
+└── batch_<名前または日時>/
+    ├── narrative.json
+    ├── analysis.json
+    ├── analysis.md
+    ├── element_pools.json
+    ├── plot_types.json
+    ├── world.md
+    ├── batch_manifest.json
+    └── run_001/
+        ├── <日時>_<タイトル>.md
+        ├── metadata.json
+        ├── narrative_analysis.md
+        ├── world.md
+        ├── plot_skeleton.md
+        └── visual_prompts.md
 ```
 
-2. **APIキーの設定**
-```python
-openai.api_key = "your-api-key-here"
-```
+生成途中または失敗時には、`run_001/` に `draft.json`、`chapter_01.md`、
+`chapter_progress.json` が追加されます。これらは再開に使われ、完成後は最終成果物へ整理されます。
+`batch_manifest.json` には完了数、試行数、重複破棄数、設定、エラー内容が記録されます。
 
-3. **基本設定の入力**
-作家のナラティブとして以下の項目を入力：
-- 自己紹介
-- 欠けているもの
-- 物語のキーワード
+`output/` と `data/` は `.gitignore` で除外されています。共有用の完成作例は [examples/README.md](examples/README.md) を参照してください。
 
-### 実行フロー
+## Python API
 
-1. **初期設定**
-   - ライブラリのインポート
-   - API認証
-   - ヘルパー関数の定義
-
-2. **作家のナラティブ入力**
-   - 自分の特徴や価値観を記述
-   - 現在の課題や欠落感を表現
-   - 物語のテーマとなるキーワードを設定
-
-3. **主人公の生成**
-   - AIが作家のナラティブに基づいて主人公を創造
-   - 性格、背景、目標などを詳細に設定
-
-4. **サポートキャラクターの生成**
-   - 援助者、使者、敵対者を自動生成
-   - それぞれのキャラクターの役割と特徴を定義
-
-5. **世界観の構築**
-   - 日常世界と非日常世界の設定
-   - 社会構造や文化の詳細化
-
-6. **プロット骨子の生成**
-   - A～Eパートに分けて物語の骨子を作成
-   - 各パートで重要なイベントや転換点を設定
-
-7. **最終プロットの生成**
-   - すべての要素を統合
-   - 12段階の物語構造に沿った完全なプロットを生成
-
-## ヘルパー関数
-
-### `ai(prompt, model="o3-mini")`
-OpenAI APIを使用してテキストを生成します。
-
-**パラメータ:**
-- `prompt`: AIへの指示文
-- `model`: 使用するモデル（デフォルト: o3-mini）
-
-**戻り値:** 生成されたテキスト
-
-### `ai_list(prompt, model="o3-mini")`
-JSON形式でデータを生成します。
-
-**パラメータ:**
-- `prompt`: AIへの指示文
-- `model`: 使用するモデル
-
-**戻り値:** JSON形式のデータ（辞書型）
-
-### `show(data)`
-データをMarkdown形式で美しく表示します。
-
-### `rich_print(markdown_text)`
-Markdown形式のテキストをレンダリングして表示します。
-
-## Google Sheets統合
-
-生成したデータをGoogle Sheetsに保存できます：
+CLIと同じ完全版パイプラインをPythonから呼び出せます。
 
 ```python
-import gspread
-from google.auth import default
-from google.colab import auth
+import json
 
-auth.authenticate_user()
-creds, _ = default()
-gc = gspread.authorize(creds)
+from src.colab_pipeline import ColabParityPipeline, PipelineConfig
+from src.narrative_analyzer import NarrativeInput
+from src.ollama_client import OllamaConfig
 
-# スプレッドシートを開く
-sheet_url = 'your-sheet-url'
-spreadsheet = gc.open_by_url(sheet_url)
-worksheet = spreadsheet.worksheet('test')
+with open("narrative.example.json", encoding="utf-8") as handle:
+    narrative = NarrativeInput(**json.load(handle))
+
+pipeline = ColabParityPipeline(
+    ollama_config=OllamaConfig(model="gpt-oss:20b")
+)
+batch = pipeline.run(
+    narrative,
+    PipelineConfig(
+        pool_size=3,
+        variation_count=1,
+        output_dir="output",
+        random_seed=42,
+    ),
+)
+print(batch.output_dir)
 ```
 
-## カスタマイズ
+同じ処理をコードから試す短い例は [example.py](example.py) にあります。
+低レベルの `StoryGenerator` は、分析済みの材料を個別に扱いたい場合に利用できます。
+通常の一括生成、途中再開、重複除外には `ColabParityPipeline` を推奨します。
 
-### モデルの変更
-異なるAIモデルを使用する場合：
+## 外部APIを使う場合
 
-```python
-# GPT-4o-miniを使用
-result = ai("プロンプト", model="gpt-4o-mini")
+標準設定は外部APIを使わないOllamaです。クラウドプロバイダーを使う場合は、APIキーを環境変数に設定します。
+CLI実装は追加SDKではなくHTTP経由で呼び出すため、`requirements.txt` のまま利用できます。
 
-# DeepSeek APIを使用する場合（コメントアウトを解除）
-# openai.api_base = "https://api.deepseek.com"
-# openai.api_key = "your-deepseek-key"
+```bash
+export OPENAI_API_KEY=...
+python run_pipeline.py --provider openai --model o3-mini --loops 1
+
+export ANTHROPIC_API_KEY=...
+python run_pipeline.py --provider anthropic --model claude-3-5-sonnet-20241022 --loops 1
+
+export DEEPSEEK_API_KEY=...
+python run_pipeline.py --provider deepseek --model deepseek-reasoner --loops 1
 ```
 
-### Reasoning Effortの調整
-o3-miniモデルのreasoning effortを変更：
-- `"low"`: 高速だが精度は低い
-- `"medium"`: バランス型（デフォルト）
-- `"high"`: 高精度だが時間がかかる
+API利用では入力が外部サービスへ送られ、サービスごとの料金・利用可能モデル・規約が適用されます。
+APIキーをソースコードやナラティブJSONへ書かないでください。
 
-## 注意事項
+Python APIでは、分析・プロット・執筆に異なるクライアントを指定することもできます。
+Google Sheets保存用の `src/sheet_storage.py` は `gspread` のWorksheet互換オブジェクトを受け取りますが、
+認証処理と `gspread` のインストールは利用者が用意してください。
 
-⚠️ **セキュリティ**
-- APIキーは環境変数として管理することを推奨します
-- ノートブックを公開する前に、APIキーを削除してください
+## Colabノートブック
 
-⚠️ **コスト**
-- OpenAI APIの使用には料金が発生します
-- 特にo3-miniモデルは高reasoning effortで高額になる可能性があります
+`20250208-100-Times-AI-Heros-Journey-v.10.ipynb` は元のGoogle Colab版です。
+ノートブックを使う場合は、ノートブック内の依存関係・APIキー設定・セル実行順に従ってください。
+ローカル版の実装と完全に同じ依存関係や保存形式ではありません。
 
-⚠️ **データ管理**
-- Google Sheetsに保存する場合は適切なアクセス権限を設定してください
+## 開発・テスト
+
+```bash
+python -m pip install -r requirements-dev.txt
+python -m pytest -q
+```
+
+テストはOllamaへ接続せず、クライアント契約・生成器・途中再開・重複除外などを検証します。
+詳細な設計メモは [docs/design-spec-local.md](docs/design-spec-local.md) を参照してください。
+
+## 制約と目安
+
+- 生成時間はモデル、量子化、GPU/CPU、コンテキスト長、同時実行中の負荷で大きく変わります。
+- 20B級モデルでは、最初の1作品でも数分〜数十分かかる場合があります。まず `--loops 1 --pool-size 3` で確認してください。
+- 100作品を生成すると、各作品の本文・付随成果物ぶんの時間とディスク容量が必要です。
+- ローカル版は入力と出力をローカルに保存しますが、指定したクラウドプロバイダーを使う場合はこの限りではありません。
+- 生成物はAI出力です。公開前に内容、権利、個人情報、安全性を確認してください。
 
 ## ライセンス
 
-MIT License
-
-## 貢献
-
-プルリクエストを歓迎します。大きな変更の場合は、まずissueを開いて変更内容を議論してください。
+MIT License（[LICENSE](LICENSE)）
 
 ## 作者
 
 masa-jp-art
-
-## ローカル版開発（Ollama + gpt-oss:20b）
-
-### 概要
-
-完全にローカル環境で動作するバージョンです。Ollamaとgpt-oss:20bモデルを使用することで、外部APIに依存せず、プライバシーを保ちながら物語を生成できます。
-
-### モデル選択ガイド
-
-ローカル版では目的・マシンスペックに応じてモデルを選択できます。
-
-| モデル | 種別 | 推奨メモリ | 用途 |
-|---|---|---|---|
-| **`gpt-oss:20b`** | 標準（**デフォルト**） | 約15GB | バランス重視・推奨 |
-| `gpt-oss:20b-q8_0` | 量子化版 (Q8) | 約12GB | ほぼ同等品質・省メモリ |
-| `gpt-oss:20b-q5_K_M` | 量子化版 (Q5) | 約8GB | バランス型 |
-| `gpt-oss:20b-q4_K_M` | 量子化版 (Q4) | 約7GB | メモリ効率重視 |
-| `gpt-oss:20b-q4_0` | 量子化版 (Q4) | 約6GB | 最小メモリ構成 |
-| `gpt-oss:120b` | 高性能 | 約80GB以上 | 最高品質・高スペック機向け |
-| `gpt-oss:120b-q4_K_M` | 高性能量子化版 | 約45GB | 省メモリ高性能版 |
-
-> **量子化版について**: Q数が低いほどメモリ使用量は小さくなりますが、生成品質はやや低下します。RAM が16GB未満の場合は `q4_K_M` や `q4_0` をお試しください。
-
-> **`gpt-oss:120b` について**: より高精度な物語生成が必要な高スペックマシン（64GB RAM 以上推奨）向けです。デフォルトは引き続き `gpt-oss:20b` です。
-
-モデルを変更するには `OllamaConfig` の `model=` 引数を指定します:
-
-```python
-from src.ollama_client import OllamaConfig, AVAILABLE_MODELS
-
-# 量子化版を使用（メモリ節約）
-config = OllamaConfig(model="gpt-oss:20b-q4_K_M")
-
-# 高性能マシン向け
-config = OllamaConfig(model="gpt-oss:120b")
-
-# 利用可能なモデル一覧を確認
-print(AVAILABLE_MODELS)
-```
-
-### 出力ディレクトリ構造
-
-何度も実行してアイデアを探索するプロジェクト用途を想定し、実行ごとに一意のディレクトリへ出力を保存します。
-
-```
-output/
-├── run_20250315_120530/       ← 1回目の実行
-│   ├── 20250315_120530_タイトル.md   （物語）
-│   └── narrative_analysis.md         （ナラティブ分析）
-├── run_20250315_145200/       ← 2回目の実行
-│   ├── 20250315_145200_タイトル.md
-│   └── narrative_analysis.md
-└── ...
-```
-
-`save_run()` メソッドを使うと、物語と分析結果が同じ実行ディレクトリに一括保存されます:
-
-```python
-run_dir = generator.save_run(story)
-print(f"保存先: {run_dir}/")
-```
-
-従来の `save_story()` / `save_analysis()` も引き続き利用できます（後方互換性あり）。
-
-### 開発ハーネスの使用方法
-
-開発ハーネスは、ローカル版を安全に開発・テストするためのツールセットです。
-
-#### 1. 前提条件
-
-```bash
-# Ollamaのインストール（macOS）
-brew install ollama
-
-# gpt-oss:20bモデルのダウンロード
-ollama pull gpt-oss:20b
-
-# Ollamaサーバーの起動
-ollama serve
-```
-
-#### 2. 依存関係のインストール
-
-```bash
-cd harness
-pip install -r requirements.txt
-```
-
-#### 3. テストの実行
-
-```bash
-# すべてのテストを実行
-python3 run_all_tests.py
-
-# または、個別にテストを実行
-python3 01_test_ollama_connection.py
-python3 02_test_narrative_analysis.py
-python3 03_test_character_generation.py
-```
-
-#### 4. テスト結果の確認
-
-```bash
-# ログファイルを確認
-cat harness/logs/connection_test.log
-cat harness/logs/narrative_analysis_test.log
-
-# 生成されたテスト出力を確認
-ls -la harness/test_output/
-```
-
-#### 5. 本番実装の使用
-
-```bash
-# 依存関係のインストール
-pip install -r requirements.txt
-
-# 使用例の実行
-python3 example.py
-```
-
-**コード例:**
-
-```python
-from src.ollama_client import OllamaConfig
-from src.narrative_analyzer import NarrativeInput
-from src.story_generator import StoryGenerator
-
-# ナラティブ入力を準備
-narrative = NarrativeInput(
-    author="あなたの自己紹介",
-    missing="欠けているもの",
-    status="現在の状態",
-    # ... 他の項目
-)
-
-# 物語生成
-generator = StoryGenerator()
-story = generator.generate(narrative, plot_type="旅 (Quest)")
-
-# 実行ごとのディレクトリに保存（output/run_YYYYMMDD_HHMMSS/ が自動作成されます）
-run_dir = generator.save_run(story)
-print(f"保存先: {run_dir}/")
-```
-
-### ドキュメント
-
-- [ローカル版設計仕様書](docs/design-spec-local.md) - 詳細な設計仕様
-- [開発ハーネスREADME](harness/README.md) - ハーネスの詳細な使い方
-
-### 開発状況
-
-- [x] 設計仕様書作成
-- [x] 開発ハーネス作成
-- [x] Ollama接続テスト
-- [x] ナラティブ分析テスト
-- [x] キャラクター生成テスト
-- [x] プロット生成テスト
-- [x] 物語執筆テスト
-- [x] 本番実装（src/ディレクトリ）
-- [ ] 統合テスト
-- [ ] Jupyter Notebook作成
-
-### 注意事項
-
-⚠️ **開発ファイル**: `harness/` ディレクトリの内容はGitHubにアップロードされません（`.gitignore`で除外設定済み）
-
-⚠️ **ハードウェア要件**:
-- CPU: 8コア以上推奨（Apple M1/M2 推奨）
-- メモリ: 32GB以上推奨（gpt-oss:20b 標準版）、量子化版 (q4_K_M) は 16GB でも動作可能
-- ストレージ: 20GB以上（モデル用）
-- **gpt-oss:120b を使用する場合**: 64GB RAM 以上を推奨
-
-⚠️ **処理時間**: gpt-oss:20bは大規模モデルのため、CPU推論では処理に時間がかかります。
-
-## 参考文献
-
-- Joseph Campbell『千の顔をもつ英雄』
-- Christopher Vogler『The Writer's Journey: Mythic Structure for Writers』
-- [Ollama 公式ドキュメント](https://ollama.com/)

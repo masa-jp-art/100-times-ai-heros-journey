@@ -1,0 +1,24 @@
+{
+  "pool_size": 3,
+  "variation_count": 1,
+  "generated_count": 1,
+  "completed_count": 1,
+  "completed_indices": [
+    1
+  ],
+  "attempts": 1,
+  "duplicate_count": 0,
+  "complete": true,
+  "write_chapters": true,
+  "generate_world": true,
+  "generate_skeleton": true,
+  "generate_visual_prompts": true,
+  "journey_stage_count": 12,
+  "chapter_count": 10,
+  "max_chapter_continuations": 2,
+  "random_seed": 43,
+  "deduplicate": true,
+  "max_attempts": null,
+  "batch_id": null,
+  "error": null
+}

@@ -1,0 +1,18 @@
+{
+  "title": "風の鼓音",
+  "fingerprint": "a4d9a04ba02e08cd94d41cdcd239c24c87e9e8b3fc905dbfeb8a637384d050fb",
+  "plot_type": "- **name**: 成り上がり\n- **core_structure**: 感情コミュニケーションを習得し、尊敬と成功を目指す社会的階層を登る物語\n- **required_events**:\n  - [0]: 目標設定\n  - [1]: 感情スキルの学習\n  - [2]: 拒絶への対処\n  - [3]: 影響力の獲得\n  - [4]: 認知の達成\n  - [5]: 犠牲の直面\n- **character_requirements**: 野心的主人公、協力者、懐疑的ライバル、権威者\n- **time_design**: \n- **conflict**: \n- **climax**: \n- **pacing**: ",
+  "chapter_count": 10,
+  "character_names": {
+    "protagonist": "斎藤 仁志",
+    "messenger": "風紋の使徒 カオル",
+    "supporter": "風間 依香（かざま いか）",
+    "adversary": "黒川 織弥"
+  },
+  "selected_elements": {
+    "ability": "Dreamscape Construction",
+    "narrative": "自発的コミュニケーション",
+    "role": "プライドが感情交流を妨げる",
+    "want": "安心できる居場所を確保する"
+  }
+}

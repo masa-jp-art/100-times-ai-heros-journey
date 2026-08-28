@@ -1,0 +1,51 @@
+[
+  {
+    "name": "人間ドラマ",
+    "core_structure": "主人公のプライドと孤独を巡る内面葛藤を、重要な対人交流を通じて描く線形構造",
+    "required_events": [
+      "孤立の描写",
+      "初めての意味ある対話",
+      "プライドの対峙",
+      "感情の突破",
+      "自己受容の結末"
+    ],
+    "character_requirements": "知的だが感情抑制の主人公、支援的友人、メンター、親密な相手",
+    "time_design": "",
+    "conflict": "",
+    "climax": "",
+    "pacing": ""
+  },
+  {
+    "name": "成り上がり",
+    "core_structure": "感情コミュニケーションを習得し、尊敬と成功を目指す社会的階層を登る物語",
+    "required_events": [
+      "目標設定",
+      "感情スキルの学習",
+      "拒絶への対処",
+      "影響力の獲得",
+      "認知の達成",
+      "犠牲の直面"
+    ],
+    "character_requirements": "野心的主人公、協力者、懐疑的ライバル、権威者",
+    "time_design": "",
+    "conflict": "",
+    "climax": "",
+    "pacing": ""
+  },
+  {
+    "name": "再生",
+    "core_structure": "孤立から本当の関係を築き、自己再定義へ至る再生の循環的構造",
+    "required_events": [
+      "孤立の触発",
+      "共感的相手との出会い",
+      "感情の突破",
+      "恐怖との対峙",
+      "アイデンティティの再生"
+    ],
+    "character_requirements": "内向的主人公、共感的触媒、自己防衛的敵対者、コミュニティ",
+    "time_design": "",
+    "conflict": "",
+    "climax": "",
+    "pacing": ""
+  }
+]

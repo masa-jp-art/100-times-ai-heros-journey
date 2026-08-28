@@ -88,6 +88,13 @@ class NarrativeAnalyzer:
 
         logger.info("ナラティブ分析を開始")
 
+        # gpt-ossは個別の自由記述分析を3回行った後、その長文を
+        # さらにJSON化すると推論枠を使い切りやすい。ローカルOllamaでは
+        # 同じ成果物を1回の簡潔な構造化要求で作り、他クライアントの
+        # 従来の呼び出し契約はそのまま維持する。
+        if isinstance(self.client, OllamaClient):
+            return self._analyze_compact(narrative_text)
+
         # 願望分析
         logger.info("願望分析を開始")
         desire = self._analyze_desire(narrative_text)
@@ -109,6 +116,42 @@ class NarrativeAnalyzer:
             suppression=suppression,
             conflict=conflict,
             elements=elements
+        )
+
+    def _analyze_compact(self, narrative_text: str) -> NarrativeAnalysis:
+        """Ollama向けに分析結果を1回の短いJSON応答で取得する。"""
+        prompt = f"""以下のナラティブを分析し、JSONだけを返してください。
+各分析は250文字以内、narrative要素は短い語句を10個にしてください。
+キーは desire（願望）、suppression（抑圧）、conflict（葛藤）、narrative（要素）です。
+
+{narrative_text}
+
+出力例:
+{{"desire":"...","suppression":"...","conflict":"...","narrative":["要素1","要素2","要素3","要素4","要素5","要素6","要素7","要素8","要素9","要素10"]}}"""
+        result = self.client.chat_json(
+            prompt=prompt,
+            system="分析結果を簡潔にまとめる専門家です。JSON以外は出力しません。",
+            temperature=0.3,
+            num_predict=4096,
+        )
+        elements = result.get("narrative", [])
+        if not isinstance(elements, list) or not elements:
+            raise ValueError("No narrative elements returned")
+
+        values = {
+            key: str(result.get(key, "")).strip()
+            for key in ("desire", "suppression", "conflict")
+        }
+        if not all(values.values()):
+            raise ValueError("Incomplete narrative analysis returned")
+
+        return NarrativeAnalysis(
+            desire=values["desire"],
+            suppression=values["suppression"],
+            conflict=values["conflict"],
+            elements=tuple(
+                str(item).strip() for item in elements[:10] if str(item).strip()
+            ),
         )
 
     def _analyze_desire(self, narrative_text: str) -> str:

@@ -1,0 +1,18 @@
+{
+  "title": "欠落した共鳴",
+  "fingerprint": "3fc77d3a2e0020c0f906d4b5f01788ccd6fe916bf3f1993a6164dc278cb37202",
+  "plot_type": "- **name**: 人間ドラマ\n- **core_structure**: 孤独な内面から他者との真の接続へ向かう心理的変容のプロセスを描く\n- **required_events**:\n  - [0]: 幼少期の孤立体験が現在の防衛機制として機能していることの発見\n  - [1]: プライドや承認欲求の壁が他者との距離を生んでいることへの気づき\n  - [2]: 友人や尊敬する人との対話を通じて感情の壁が崩れる瞬間\n  - [3]: 「許せない」という感情を受容し、自己と他者の境界を溶かす決断\n- **character_requirements**: \n- **time_design**: \n- **conflict**: \n- **climax**: \n- **pacing**: ",
+  "chapter_count": 10,
+  "character_names": {
+    "protagonist": "森 蒼 (Morin Sou)",
+    "messenger": "榊原 誠",
+    "supporter": "神崎 蓮",
+    "adversary": "神崎 蓮"
+  },
+  "selected_elements": {
+    "ability": "空想空間の構築",
+    "narrative": "他者の尊厳を損なわない関係性への倫理的葛藤",
+    "role": "安心できる孤立の世界を失う恐怖と、真の繋がりへの渇望",
+    "want": "孤立した空想の世界から抜け出し、感情を共有する共同体の一員になること"
+  }
+}

@@ -7,7 +7,7 @@
 import re
 import logging
 import random
-from typing import List
+from typing import List, Mapping, Optional
 from dataclasses import dataclass
 from .ollama_client import OllamaClient
 
@@ -57,10 +57,36 @@ class CharacterGenerator:
         """
         self.client = client
 
+    def _chat(
+        self,
+        *,
+        prompt: str,
+        system: str,
+        temperature: float,
+        num_predict: int,
+    ) -> str:
+        """短い人物設定に出力上限を付け、差し替えクライアントにも対応する。"""
+        try:
+            return self.client.chat(
+                prompt=prompt,
+                system=system,
+                temperature=temperature,
+                num_predict=num_predict,
+            )
+        except TypeError as exc:
+            if "num_predict" not in str(exc):
+                raise
+            return self.client.chat(
+                prompt=prompt,
+                system=system,
+                temperature=temperature,
+            )
+
     def generate(
         self,
         narrative_elements: List[str],
-        plot_type: str
+        plot_type: str,
+        element_context: Optional[Mapping[str, str]] = None,
     ) -> CharacterSet:
         """
         キャラクターセットを生成
@@ -68,6 +94,7 @@ class CharacterGenerator:
         Args:
             narrative_elements: ナラティブ要素リスト
             plot_type: 物語の構造タイプ
+            element_context: Colab版の要素プールから選択済みの要素
 
         Returns:
             キャラクターセット
@@ -83,17 +110,20 @@ class CharacterGenerator:
             raise ValueError("plot_type must be provided")
 
         # ランダムに要素を選択
-        selected_elements = self._select_elements(narrative_elements)
+        selected_elements = self._select_elements(
+            narrative_elements,
+            element_context=element_context,
+        )
 
         # 各キャラクターを生成
         logger.info("主人公を生成中")
         protagonist = self._generate_protagonist(selected_elements, plot_type)
         logger.info("使者を生成中")
-        messenger = self._generate_messenger(protagonist)
+        messenger = self._generate_messenger(protagonist, selected_elements, plot_type)
         logger.info("援助者を生成中")
-        supporter = self._generate_supporter(protagonist)
+        supporter = self._generate_supporter(protagonist, selected_elements, plot_type)
         logger.info("敵対者を生成中")
-        adversary = self._generate_adversary(protagonist)
+        adversary = self._generate_adversary(protagonist, selected_elements, plot_type)
 
         return CharacterSet(
             protagonist=protagonist,
@@ -102,10 +132,28 @@ class CharacterGenerator:
             adversary=adversary
         )
 
-    def _select_elements(self, narrative_elements: List[str]) -> dict:
+    def _select_elements(
+        self,
+        narrative_elements: List[str],
+        element_context: Optional[Mapping[str, str]] = None,
+    ) -> dict:
         """ナラティブ要素からランダムに選択"""
         if len(narrative_elements) < 3:
             raise ValueError("Not enough narrative elements")
+
+        if element_context is not None:
+            required = ("narrative", "want", "ability", "role")
+            missing = [key for key in required if not element_context.get(key)]
+            if missing:
+                raise ValueError(
+                    "element_context is missing: " + ", ".join(missing)
+                )
+            return {
+                "narrative": str(element_context["narrative"]),
+                "want": str(element_context["want"]),
+                "ability": str(element_context["ability"]),
+                "role": str(element_context["role"]),
+            }
 
         selected = random.sample(narrative_elements, 3)
         return {
@@ -127,16 +175,18 @@ class CharacterGenerator:
 - 抑圧されている自己像: {selected_elements['narrative']}
 - 内面の願望: {selected_elements['want']}
 - 秘めた能力: {selected_elements['ability']}
+- 個人的な課題: {selected_elements.get('role', '未設定')}
 
 フォーマット:
 名前: [主人公の名前]
 
 [プロフィール本文]"""
 
-        result = self.client.chat(
+        result = self._chat(
             prompt=prompt,
             system="あなたは優れた小説家です。",
-            temperature=0.7
+            temperature=0.7,
+            num_predict=768,
         )
 
         # 名前とプロフィールを抽出
@@ -148,12 +198,19 @@ class CharacterGenerator:
             profile=profile
         )
 
-    def _generate_messenger(self, protagonist: Character) -> Character:
+    def _generate_messenger(
+        self,
+        protagonist: Character,
+        selected_elements: Optional[Mapping[str, str]] = None,
+        plot_type: str = "旅 (Quest)",
+    ) -> Character:
         """使者生成"""
         prompt = f"""以下の主人公に対して、冒険への一歩を踏み出すきっかけを作る「使者」のキャラクターを
 200文字程度で作成してください。名前も付けてください。
 
-主人公: {protagonist.profile[:100]}...
+主人公: {protagonist.profile}
+物語の構造: {plot_type}
+関連する課題: {(selected_elements or {}).get('role', '未設定')}
 
 使者は主人公に知恵や助言を与え、成長のための方向性を提供する存在です。
 
@@ -162,10 +219,11 @@ class CharacterGenerator:
 
 [プロフィール本文]"""
 
-        result = self.client.chat(
+        result = self._chat(
             prompt=prompt,
             system="あなたは優れた小説家です。",
-            temperature=0.7
+            temperature=0.7,
+            num_predict=512,
         )
 
         name, profile = self._parse_character_response(result)
@@ -176,12 +234,19 @@ class CharacterGenerator:
             profile=profile
         )
 
-    def _generate_supporter(self, protagonist: Character) -> Character:
+    def _generate_supporter(
+        self,
+        protagonist: Character,
+        selected_elements: Optional[Mapping[str, str]] = None,
+        plot_type: str = "旅 (Quest)",
+    ) -> Character:
         """援助者生成"""
         prompt = f"""以下の主人公をサポートする「援助者」のキャラクターを
 200文字程度で作成してください。名前も付けてください。
 
-主人公: {protagonist.profile[:100]}...
+主人公: {protagonist.profile}
+物語の構造: {plot_type}
+関連する能力: {(selected_elements or {}).get('ability', '未設定')}
 
 援助者は主人公を助けたり、試練を通じて成長を促す存在です。
 
@@ -190,10 +255,11 @@ class CharacterGenerator:
 
 [プロフィール本文]"""
 
-        result = self.client.chat(
+        result = self._chat(
             prompt=prompt,
             system="あなたは優れた小説家です。",
-            temperature=0.7
+            temperature=0.7,
+            num_predict=512,
         )
 
         name, profile = self._parse_character_response(result)
@@ -204,12 +270,19 @@ class CharacterGenerator:
             profile=profile
         )
 
-    def _generate_adversary(self, protagonist: Character) -> Character:
+    def _generate_adversary(
+        self,
+        protagonist: Character,
+        selected_elements: Optional[Mapping[str, str]] = None,
+        plot_type: str = "旅 (Quest)",
+    ) -> Character:
         """敵対者生成"""
         prompt = f"""以下の主人公が克服すべき「敵対者」のキャラクターを
 200文字程度で作成してください。名前も付けてください。
 
-主人公: {protagonist.profile[:100]}...
+主人公: {protagonist.profile}
+物語の構造: {plot_type}
+主人公が向き合う課題: {(selected_elements or {}).get('role', '未設定')}
 
 敵対者は主人公の成長を試す存在であり、恐怖、誘惑、葛藤を象徴します。
 
@@ -218,10 +291,11 @@ class CharacterGenerator:
 
 [プロフィール本文]"""
 
-        result = self.client.chat(
+        result = self._chat(
             prompt=prompt,
             system="あなたは優れた小説家です。",
-            temperature=0.7
+            temperature=0.7,
+            num_predict=512,
         )
 
         name, profile = self._parse_character_response(result)
