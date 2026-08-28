@@ -301,7 +301,3 @@ python -m pytest -q
 ## ライセンス
 
 MIT License（[LICENSE](LICENSE)）
-
-## 作者
-
-masa-jp-art
