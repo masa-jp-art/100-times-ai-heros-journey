@@ -5,6 +5,15 @@
 元のGoogle Colabノートブックもリポジトリに残していますが、繰り返し生成・途中再開・重複除外を行う場合は、
 ローカル版の `run_pipeline.py` を使ってください。
 
+## 兄弟リポジトリ
+
+AI創作の各工程に対応する関連リポジトリです。
+
+- [100-times-ai-heroes](https://github.com/masa-san-jp/100-times-ai-heroes)：ローカルCSV、Ollama、ComfyUIを使って、キャラクター設定と全身画像を生成します。
+- [100-times-ai-heros-journey](https://github.com/masa-san-jp/100-times-ai-heros-journey)（本リポジトリ）：自己ナラティブから、ヒーローズ・ジャーニー形式の物語を生成します。
+- [100-times-ai-world-building](https://github.com/masa-san-jp/100-times-ai-world-building)：AIを活用した世界観構築ワークフローをJupyter Notebookで体験できます。
+- [100-times-ai-manga-drawing](https://github.com/masa-san-jp/100-times-ai-manga-drawing)：生成AIを活用したマンガ作画の実験・制作ワークフローを扱います。
+
 ## まず動かす
 
 ### 必要なもの
